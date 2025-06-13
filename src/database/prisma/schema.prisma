@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     Int                     @id @default(autoincrement())
+  email                  String                  @unique
+  username               String                  @unique
+  passwordHash           String
+  role                   user_role               @default(user)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  deletedAt              DateTime?
+  rankings               Ranking[]
+  teamMembers            TeamMember[]
+  tournamentParticipants TournamentParticipant[]
+}
+
+model Ranking {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  gameName      game_name
+  matchesPlayed Int       @default(0)
+  wins          Int       @default(0)
+  points        Int       @default(0)
+  rankPosition  Int?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameName])
+}
+
+model Tournament {
+  id           Int                     @id @default(autoincrement())
+  gameName     game_name
+  name         String
+  startDate    DateTime
+  maxSlots     Int
+  mode         tournament_mode
+  rules        String?
+  requirements String?
+  prizes       String?
+  bracketType  bracket_type
+  status       tournament_status
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  deletedAt    DateTime?
+  participants TournamentParticipant[]
+  teams        TournamentTeam[]
+}
+
+model TournamentParticipant {
+  id           Int        @id @default(autoincrement())
+  tournamentId Int
+  userId       Int
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+}
+
+model Team {
+  id        Int              @id @default(autoincrement())
+  name      String           @unique
+  createdAt DateTime         @default(now())
+  members   TeamMember[]
+  entries   TournamentTeam[]
+}
+
+model TeamMember {
+  id     Int  @id @default(autoincrement())
+  teamId Int
+  userId Int
+  team   Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model TournamentTeam {
+  id           Int        @id @default(autoincrement())
+  tournamentId Int
+  teamId       Int
+  team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, teamId])
+}
+
+enum tournament_mode {
+  solo
+  team
+}
+
+enum user_role {
+  user
+  admin
+}
+
+enum tournament_status {
+  open
+  progress
+  closed
+}
+
+enum bracket_type {
+  singleElimination
+  doubleElimination
+  freeForAll
+  roundRobin
+  swiss
+  leaderboard
+}
+
+enum game_name {
+  leagueOfLegends
+  rocketLeague
+  counterStrike
+  valorant
+}
