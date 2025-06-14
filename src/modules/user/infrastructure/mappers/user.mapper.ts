@@ -30,7 +30,7 @@ export const UserMapper = {
     return {
       email: dto.email,
       username: dto.username,
-      password: dto.password,
+      passwordHash: dto.password,
       role: user_role.user, 
     };
   },

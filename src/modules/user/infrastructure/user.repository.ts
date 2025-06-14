@@ -8,7 +8,6 @@ import { PrismaService } from 'src/database/prisma/prisma.service';
 import { User } from '../domain/user.entity';
 import { CreateUserInput } from '../dtos/internal/create-user.input';
 import { UserMapper } from './mappers/user.mapper';
-import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import { AppLogger } from 'src/common/utils/logger.service';
 
@@ -22,13 +21,13 @@ export class UserRepository implements IUserRepository {
   ) {}
 
   async findById(id: number): Promise<User | null> {
-    this.logger.log(`Buscando usuario por ID: ${id}`, this.context);
+    this.logger.log(`[findById] Buscando usuario por ID: ${id}`, this.context);
     try {
       const prismaUser = await this.prisma.user.findUnique({ where: { id } });
       return prismaUser ? UserMapper.toDomain(prismaUser) : null;
     } catch (error) {
       this.logger.error(
-        `Error al buscar usuario por ID: ${id}`,
+        `[findById] Error al buscar usuario por ID: ${id}`,
         error.stack,
         this.context,
       );
@@ -37,7 +36,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    this.logger.log(`Buscando usuario por email: ${email}`, this.context);
+    this.logger.log(`[findByEmail] Buscando usuario por email: ${email}`, this.context);
     try {
       const prismaUser = await this.prisma.user.findUnique({
         where: { email },
@@ -45,7 +44,7 @@ export class UserRepository implements IUserRepository {
       return prismaUser ? UserMapper.toDomain(prismaUser) : null;
     } catch (error) {
       this.logger.error(
-        `Error al buscar usuario por email: ${email}`,
+        `[findByEmail] Error al buscar usuario por email: ${email}`,
         error.stack,
         this.context,
       );
@@ -54,7 +53,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    this.logger.log(`Buscando usuario por username: ${username}`, this.context);
+    this.logger.log(`[findByUsername] Buscando usuario por username: ${username}`, this.context);
     try {
       const prismaUser = await this.prisma.user.findUnique({
         where: { username },
@@ -62,7 +61,7 @@ export class UserRepository implements IUserRepository {
       return prismaUser ? UserMapper.toDomain(prismaUser) : null;
     } catch (error) {
       this.logger.error(
-        `Error al buscar usuario por username: ${username}`,
+        `[findByUsername] Error al buscar usuario por username: ${username}`,
         error.stack,
         this.context,
       );
@@ -71,23 +70,43 @@ export class UserRepository implements IUserRepository {
   }
 
   async create(data: CreateUserInput): Promise<User> {
-    this.logger.log(`Creando usuario: ${data.email}`, this.context);
+    this.logger.log(`[create] Verificando existencia de usuario: ${data.email} / ${data.username}`, this.context);
+
     try {
-      const passwordHash = await bcrypt.hash(data.password, 10);
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: data.email },
+            { username: data.username },
+          ],
+        },
+      });
+
+      if (existingUser) {
+        this.logger.warn(
+          `[create] Usuario ya existe: ${data.email} o ${data.username}`,
+          this.context,
+        );
+        throw new ConflictException(
+          'El correo electrónico o nombre de usuario ya está en uso',
+        );
+      }
+
+      this.logger.log(`[create] Creando usuario: ${data.email}`, this.context);
 
       const prismaUser = await this.prisma.user.create({
         data: {
           email: data.email,
           username: data.username,
-          passwordHash,
-          role: data.role,
+          passwordHash: data.passwordHash,
+          role: data.role ?? 'USER',
         },
       });
 
       return UserMapper.toDomain(prismaUser);
     } catch (error) {
       this.logger.error(
-        `Error al crear usuario: ${data.email}`,
+        `[create] Error al crear usuario: ${data.email}`,
         error.stack,
         this.context,
       );
